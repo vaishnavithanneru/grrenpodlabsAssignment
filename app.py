@@ -16,21 +16,22 @@ BASE_DIR = Path(__file__).resolve().parent
 MODEL_DIR = BASE_DIR / "models"
 IMAGE_SIZE = (128, 128)
 
+# Avocado branding
 st.set_page_config(
-    page_title="Orange Disease Classifier",
-    page_icon="🍊",
+    page_title="Avocado Disease Classifier",
+    page_icon="🥑",
     layout="wide",
 )
 
-st.title("🍊 Orange Disease Classification")
+st.title("🥑 Avocado Disease Classification")
 st.write(
-    "Compare classical computer vision and deep learning "
-    "for classifying orange images."
+    "Upload an avocado image and compare predictions from "
+    "classical machine learning and deep learning."
 )
 
 st.info(
-    "Classes: Blackspot, Canker, Fresh, and Greening. "
-    "Predictions are experimental and should be verified."
+    "This application classifies avocado images into the "
+    "four dataset classes: Blackspot, Canker, Fresh, and Greening."
 )
 
 
@@ -43,26 +44,28 @@ def load_models():
         MODEL_DIR / "metrics.json",
     ]
 
-    missing = [str(p) for p in required if not p.exists()]
+    missing = [str(path) for path in required if not path.exists()]
     if missing:
         raise FileNotFoundError(
-            "Model files are missing: " + ", ".join(missing)
+            "Missing model files: " + ", ".join(missing)
         )
 
     classical = joblib.load(required[0])
-    cnn = tf.keras.models.load_model(required[1], compile=False)
+    cnn = tf.keras.models.load_model(
+        required[1], compile=False
+    )
 
-    with open(required[2]) as file:
+    with open(required[2], encoding="utf-8") as file:
         classes = json.load(file)
 
-    with open(required[3]) as file:
+    with open(required[3], encoding="utf-8") as file:
         metrics = json.load(file)
 
     return classical, cnn, classes, metrics
 
 
 def extract_features(image_rgb):
-    # OpenCV uses BGR ordering.
+    """Extract the same color and texture features used in training."""
     bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
     bgr = cv2.resize(bgr, IMAGE_SIZE)
 
@@ -83,12 +86,20 @@ def extract_features(image_rgb):
     hist_a = cv2.calcHist(
         [lab], [1], None, [16], [0, 256]
     )
-    features.extend(cv2.normalize(hist_a, hist_a).flatten())
-
-    lbp = local_binary_pattern(gray, 8, 1, method="uniform")
-    hist, _ = np.histogram(
-        lbp.ravel(), bins=np.arange(0, 12), range=(0, 11)
+    features.extend(
+        cv2.normalize(hist_a, hist_a).flatten()
     )
+
+    lbp = local_binary_pattern(
+        gray, P=8, R=1, method="uniform"
+    )
+
+    hist, _ = np.histogram(
+        lbp.ravel(),
+        bins=np.arange(0, 12),
+        range=(0, 11),
+    )
+
     hist = hist.astype(np.float32)
     hist /= max(hist.sum(), 1)
     features.extend(hist)
@@ -99,101 +110,123 @@ def extract_features(image_rgb):
 def show_probabilities(classes, probabilities):
     df = pd.DataFrame({
         "Class": classes,
-        "Probability (%)": np.asarray(probabilities) * 100,
-    })
-    df = df.sort_values("Probability (%)", ascending=False)
+        "Model probability (%)": np.asarray(probabilities) * 100,
+    }).sort_values(
+        "Model probability (%)", ascending=False
+    )
+
     st.dataframe(
-        df.style.format({"Probability (%)": "{:.2f}%"}),
+        df.style.format({"Model probability (%)": "{:.2f}%"}),
         hide_index=True,
         use_container_width=True,
     )
 
 
-def show_metrics(metrics):
-    cols = st.columns(4)
-
-    fields = [
-        ("Accuracy", "accuracy"),
-        ("Macro precision", "precision_macro"),
-        ("Macro recall", "recall_macro"),
-        ("Macro F1-score", "f1_macro"),
-    ]
-
-    for col, (label, key) in zip(cols, fields):
-        col.metric(label, f"{metrics[key] * 100:.2f}%")
-
-
 try:
     classical, cnn, classes, metrics = load_models()
 except Exception as exc:
-    st.error(f"Could not load the trained models: {exc}")
+    st.error(f"Unable to load the trained models: {exc}")
     st.warning(
-        "Run `python train_models.py` first, then restart the app."
+        "Train and save both models using train_models.py, "
+        "then restart this application."
     )
     st.stop()
 
 
+st.sidebar.header("🥑 About this application")
+st.sidebar.write(
+    "Avocado disease classification using computer vision "
+    "and a convolutional neural network."
+)
+st.sidebar.write("Classes: " + ", ".join(classes))
+
 uploaded = st.file_uploader(
-    "Upload an orange image",
+    "Upload an avocado image",
     type=["jpg", "jpeg", "png", "webp"],
+    help="Choose an image from your computer.",
 )
 
 if uploaded is not None:
-    image = Image.open(uploaded).convert("RGB")
-    image_rgb = np.asarray(image)
+    try:
+        image = Image.open(uploaded).convert("RGB")
+        image_rgb = np.asarray(image)
 
-    st.image(
-        image,
-        caption="Uploaded orange image",
-        width=400,
-    )
+        st.image(
+            image,
+            caption="Uploaded avocado image",
+            width=400,
+        )
 
-    if st.button("Classify and Compare", type="primary"):
-        with st.spinner("Analyzing the image..."):
-            features = extract_features(image_rgb).reshape(1, -1)
+        if st.button(
+            "🥑 Classify Avocado",
+            type="primary",
+        ):
+            with st.spinner("Analyzing avocado image..."):
+                # Classical ML prediction
+                features = extract_features(
+                    image_rgb
+                ).reshape(1, -1)
 
-            classical_probs = classical.predict_proba(features)[0]
-            classical_classes = classical.classes_.tolist()
-            classical_label = classical_classes[
-                int(np.argmax(classical_probs))
-            ]
+                classical_probs = classical.predict_proba(
+                    features
+                )[0]
 
-            cnn_input = cv2.resize(image_rgb, IMAGE_SIZE)
-            cnn_input = cnn_input.astype(np.float32) / 255.0
-            cnn_probs = cnn.predict(
-                np.expand_dims(cnn_input, axis=0),
-                verbose=0,
-            )[0]
-            cnn_label = classes[int(np.argmax(cnn_probs))]
+                classical_classes = classical.classes_.tolist()
+                classical_label = classical_classes[
+                    int(np.argmax(classical_probs))
+                ]
 
-        st.subheader("Prediction comparison")
+                # CNN prediction
+                cnn_image = cv2.resize(
+                    image_rgb, IMAGE_SIZE
+                ).astype(np.float32) / 255.0
 
-        left, right = st.columns(2)
+                cnn_probs = cnn.predict(
+                    np.expand_dims(cnn_image, axis=0),
+                    verbose=0,
+                )[0]
 
-        with left:
-            st.markdown("### Classical CV + Random Forest")
-            st.success(f"Predicted class: **{classical_label}**")
-            show_probabilities(classical_classes, classical_probs)
+                cnn_label = classes[
+                    int(np.argmax(cnn_probs))
+                ]
 
-        with right:
-            st.markdown("### Deep Learning CNN")
-            st.success(f"Predicted class: **{cnn_label}**")
-            show_probabilities(classes, cnn_probs)
+            st.divider()
+            st.header("🥑 Avocado Classification Results")
 
-        if classical_label == cnn_label:
-            st.success("Both models predict the same class.")
-        else:
-            st.warning(
-                "The models disagree. Review the image and "
-                "compare their test-set evaluation metrics."
-            )
+            left, right = st.columns(2)
+
+            with left:
+                st.subheader("Classical ML")
+                st.success(f"Prediction: {classical_label}")
+                show_probabilities(
+                    classical_classes, classical_probs
+                )
+
+            with right:
+                st.subheader("Deep Learning CNN")
+                st.success(f"Prediction: {cnn_label}")
+                show_probabilities(classes, cnn_probs)
+
+            if classical_label == cnn_label:
+                st.success(
+                    "Both models predict the same class."
+                )
+            else:
+                st.warning(
+                    "The models predict different classes. "
+                    "Review the image and test-set metrics."
+                )
+
+    except Exception as exc:
+        st.error(f"Could not process this image: {exc}")
+
 
 st.divider()
-st.header("Model performance on the test dataset")
+st.header("📊 Model Performance Comparison")
 
 st.caption(
-    "These metrics are measured on the held-out test dataset, "
-    "not on the image uploaded above."
+    "Metrics below are from the held-out test dataset, "
+    "not from the currently uploaded image."
 )
 
 comparison = pd.DataFrame([
@@ -230,12 +263,12 @@ st.bar_chart(
     ]
 )
 
-st.subheader("Confusion matrices")
+st.subheader("Confusion Matrices")
 
 left, right = st.columns(2)
 
 with left:
-    st.markdown("**Classical model**")
+    st.write("**Classical ML**")
     st.dataframe(
         pd.DataFrame(
             metrics["classical"]["confusion_matrix"],
@@ -246,7 +279,7 @@ with left:
     )
 
 with right:
-    st.markdown("**CNN**")
+    st.write("**CNN**")
     st.dataframe(
         pd.DataFrame(
             metrics["cnn"]["confusion_matrix"],
@@ -255,3 +288,9 @@ with right:
         ),
         use_container_width=True,
     )
+
+st.caption(
+    "For educational purposes only. Predictions depend on "
+    "the training dataset and are not a substitute for "
+    "expert agricultural diagnosis."
+)
