@@ -123,6 +123,45 @@ python3 avocado_assignment.py --predict "path/to/orange_image.jpg"
 
 Replace the image path with the actual path to the image you want to classify.
 
+## Train the Models
+
+Run the following command from the project root directory to train the models:
+```bash
+python3 train_models.py
+```
+
+This command trains the models and saves the trained model files required for image prediction. Ensure that the dataset is organized correctly before starting the training process.
+
+## Install Streamlit and Dependencies
+
+Install the required Python packages using:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+If Streamlit is not included in requirements.txt, install it separately:
+```bash
+python3 -m pip install streamlit
+```
+## Run the Streamlit Application
+
+After training the models and installing the dependencies, start the Streamlit application:
+```bash
+python3 -m streamlit run app.py
+```
+Replace app.py with the actual filename of your Streamlit application if it is different.
+
+## Test Image Predictions
+
+Once the application starts, open the local URL displayed in the terminal, usually:
+
+http://localhost:8501
+
+Upload an image to view the model's predicted class and the results displayed by the application.
+
+
+
 ## Output
 
 The project generates trained model files in the `models/` directory and evaluation outputs, such as plots and comparison results, in the `results/` directory.
@@ -134,4 +173,9 @@ This project was developed and executed locally using **Visual Studio Code (VS C
 ## Conclusion
 
 This project compares classical machine learning and deep learning approaches for orange disease image classification. It demonstrates image feature extraction, model training, performance evaluation, and image prediction in a Python-based computer vision workflow.
+### Streamlit Application
+
+The Streamlit application allows users to upload an image and predict its class. It displays the uploaded image along with the model's prediction results, making it easy to test and understand the model's performance.
+
+**Live Demo:** http://192.168.0.101:8501/
 
